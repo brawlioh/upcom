@@ -6,12 +6,12 @@ import json
 from pathlib import Path
 from loguru import logger
 from config import Config
+from typing import Dict, List, Optional
 from utils.steam_scraper import SteamScraper
 from modules.module1_intro import IntroGenerator
 from modules.module2_vizard import VizardProcessor
 from modules.module3_outro import OutroGenerator
 from modules.module4_compilation import CreatorMateCompiler
-from typing import Dict, Optional, List
 from datetime import datetime
 
 class YouTubeReelsAutomation:
@@ -230,7 +230,7 @@ class YouTubeReelsAutomation:
             logger.error(f"Error creating multiple reels: {e}")
             return []
     
-    async def run_automation(self, game_title: str = None, count: int = 1) -> List[str]:
+    async def run_automation(self, game_title: str = None, count: int = 1, game_details: Dict = None) -> List[str]:
         """Main automation runner"""
         try:
             logger.info("🚀 Starting YouTube Reels Automation")
@@ -241,6 +241,10 @@ class YouTubeReelsAutomation:
                 if not game_data:
                     logger.error(f"Could not find data for game: {game_title}")
                     return []
+                
+                # Merge provided game_details with scraped game_data
+                if game_details:
+                    game_data.update(game_details)
                 
                 reel_path = await self.create_reel_for_game(game_data)
                 return [reel_path] if reel_path else []
@@ -292,7 +296,7 @@ def show_startup_banner():
     print("🎬 Module 3: Outro Generation (OpenAI + HeyGen)")
     print("🎞️  Module 4: Final Compilation (Creatomate)")
     print("📱 Target: Vertical 9:16 format for YouTube Shorts")
-    print("🔗 Webhook: Disabled (removed to prevent 410 errors)")
+    print("🔗 Webhook: Enabled (primary method with polling fallback)")
     print("="*80)
 
 async def run_individual_module(automation, module_num: int, game_title: str):
@@ -395,43 +399,101 @@ async def main():
         created_reels = await automation.run_automation(game_title=game_title)
         automation.print_summary(created_reels)
     else:
-        # Interactive mode - prompt for game title
+        # Interactive mode - prompt for Steam App ID
         print("\n🎮 Welcome to YouTube Reels Automation!")
         print("=" * 50)
-        print("Available options:")
-        print("1. Enter a specific game title")
-        print("2. Use trending games (auto-select)")
+        print("Steam App ID Mode - Enter a Steam App ID to create a reel")
         print("=" * 50)
         
-        choice = input("\nChoose option (1 or 2): ").strip()
+        print("\n🔍 Find Steam App IDs at: https://steamdb.info/")
         
-        if choice == "1":
-            print("\n💡 Popular games available:")
-            popular_games = [
-                "Cyberpunk 2077", "Elden Ring", "Baldur's Gate 3", "Starfield", 
-                "Slay the Spire 2", "Hades 2", "Diablo 4", "Minecraft", "Fortnite"
-            ]
-            for i, game in enumerate(popular_games, 1):
-                print(f"   {i}. {game}")
-            print("   ... and more!")
+        app_id_input = input("\n🎯 Enter Steam App ID (numbers only, e.g., '1962700'): ").strip()
+        if app_id_input and app_id_input.isdigit():
+            print(f"\n🎯 Using Steam App ID: {app_id_input}")
+            print("🔍 Fetching game details from Steam...")
             
-            game_title = input("\n🎯 Enter the game title for reel generation: ").strip()
-            if game_title:
-                print(f"\n🎯 Full Pipeline Mode: {game_title}")
-                created_reels = await automation.run_automation(game_title=game_title)
+            # Import and use the Steam API scraper
+            from utils.steam_api_scraper import get_steam_game_details
+            
+            try:
+                # Get real game data from Steam
+                game_details = await get_steam_game_details(app_id_input)
+                game_title = game_details['name']
+                
+                print(f"✅ Found: {game_title}")
+                print(f"📅 Release Date: {game_details.get('release_date', 'Unknown')}")
+                print(f"👨‍💻 Developer: {game_details.get('developer', 'Unknown')}")
+                
+                if game_details.get('videos'):
+                    print(f"🎬 Found {len(game_details['videos'])} video(s)")
+                    
+                    # Ask user if they want to provide a custom video URL
+                    print(f"\n📹 Video Source Options:")
+                    print(f"1. Use Steam videos (automatic)")
+                    print(f"2. Provide custom video URL")
+                    
+                    video_choice = input("\nChoose video source (1 or 2, default=1): ").strip()
+                    
+                    if video_choice == "2":
+                        print("\n📝 Supported video platforms:")
+                        print("   • YouTube: https://www.youtube.com/watch?v=...")
+                        print("   • YouTube Shorts: https://www.youtube.com/shorts/... (auto-converted)")
+                        print("   • Steam: https://video.akamai.steamstatic.com/...")
+                        print("   • Vimeo, Twitch, Dailymotion, etc.")
+                        print("\n⚠️  Note: Vizard requires regular YouTube URLs (Shorts will be auto-converted)")
+                        custom_url = input("\n🔗 Enter video URL: ").strip()
+                        if custom_url:
+                            # Validate URL format (accept YouTube, Steam, and other video platforms)
+                            valid_domains = [
+                                'youtube.com', 'youtu.be', 'steamstatic.com', 'steampowered.com',
+                                'vimeo.com', 'twitch.tv', 'dailymotion.com', 'streamable.com'
+                            ]
+                            
+                            if any(domain in custom_url.lower() for domain in valid_domains) or custom_url.startswith('http'):
+                                # Show URL conversion preview if it needs conversion
+                                if '/shorts/' in custom_url:
+                                    video_id = custom_url.split('/shorts/')[-1].split('?')[0]
+                                    converted_url = f"https://www.youtube.com/watch?v={video_id}"
+                                    print(f"🔄 YouTube Shorts detected - will convert to: {converted_url}")
+                                elif 'youtu.be/' in custom_url:
+                                    video_id = custom_url.split('youtu.be/')[-1].split('?')[0]
+                                    converted_url = f"https://www.youtube.com/watch?v={video_id}"
+                                    print(f"🔄 youtu.be URL detected - will convert to: {converted_url}")
+                                
+                                print(f"✅ Using custom video: {custom_url}")
+                                
+                                # Ask user to confirm the video matches the game
+                                confirm = input(f"\n❓ Does this video contain '{game_title}' gameplay? (y/n, default=y): ").strip().lower()
+                                if confirm in ['n', 'no']:
+                                    print("⚠️ Please provide a video that matches the game. Using Steam videos instead.")
+                                else:
+                                    # Add custom URL to game details
+                                    if 'custom_videos' not in game_details:
+                                        game_details['custom_videos'] = []
+                                    game_details['custom_videos'].append(custom_url)
+                            else:
+                                print("⚠️ Invalid URL format. Please use YouTube, Steam, or other video platform URLs.")
+                                print("⚠️ Using Steam videos instead.")
+                        else:
+                            print("⚠️ No URL provided. Using Steam videos instead.")
+                    
+                    print(f"\n🎯 Full Pipeline Mode: {game_title}")
+                    created_reels = await automation.run_automation(game_title=game_title, game_details=game_details)
+                    automation.print_summary(created_reels)
+                    
+            except Exception as e:
+                print(f"❌ Error fetching game details: {e}")
+                print("🔄 Using fallback mode...")
+                game_title = f"Steam_Game_{app_id_input}"
+                game_details = {"app_id": app_id_input}
+                created_reels = await automation.run_automation(game_title=game_title, game_details=game_details)
                 automation.print_summary(created_reels)
-            else:
-                print("❌ No game title provided. Exiting...")
-        elif choice == "2":
-            print(f"\n🎯 Multi-Game Mode: Creating reels from trending games")
-            created_reels = await automation.run_automation(count=1)
-            automation.print_summary(created_reels)
         else:
-            print("❌ Invalid choice. Exiting...")
+            print("❌ Invalid Steam App ID. Please enter numbers only (e.g., '1962700'). Exiting...")
 
 if __name__ == "__main__":
     # Example usage:
-    # python3 main.py                                    # Multi-game mode
+    # python3 main.py                                    # Interactive Steam App ID mode
     # python3 main.py "Cyberpunk 2077"                   # Full pipeline for specific game
     # python3 main.py --module 1 "Cyberpunk 2077"       # Run only intro module
     # python3 main.py --module 2 "Cyberpunk 2077"       # Run only vizard module  

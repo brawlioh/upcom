@@ -27,38 +27,102 @@ class IntroGenerator:
             api_key=Config.CLOUDINARY_API_KEY,
             api_secret=Config.CLOUDINARY_API_SECRET
         )
+    
+    def _clean_trademark_symbols(self, script: str) -> str:
+        """Remove trademark symbols and company references from script"""
+        import re
         
+        # Remove trademark symbols
+        trademark_symbols = ['™', '®', '©', 'TM', 'SM', '(TM)', '(R)', '(C)']
+        for symbol in trademark_symbols:
+            script = script.replace(symbol, '')
+        
+        # Remove common company/trademark patterns
+        patterns_to_remove = [
+            r'\b(Inc\.?|LLC|Ltd\.?|Corporation|Corp\.?)\b',  # Company suffixes
+            r'\b(Studios?|Entertainment|Games?|Interactive)\b(?=\s|$)',  # Game company words
+            r'\bTrademark\b',  # The word "Trademark"
+            r'\bAll rights reserved\b',  # Rights text
+        ]
+        
+        for pattern in patterns_to_remove:
+            script = re.sub(pattern, '', script, flags=re.IGNORECASE)
+        
+        # Clean up extra spaces and normalize
+        script = ' '.join(script.split())
+        
+        logger.info(f"Cleaned script of trademark symbols: {script}")
+        return script
+    
     async def generate_intro_script(self, game_title: str, game_details: Dict = None) -> str:
         """Generate intro script using OpenAI"""
         try:
             logger.info(f"Generating intro script for {game_title}")
             
-            # Create context from game details
-            context = f"Game: {game_title}"
+            # Clean game title of trademark symbols before using in script
+            clean_game_title = self._clean_trademark_symbols(game_title)
+            
+            # Build context from game details
+            context = f"Game: {clean_game_title}"
             if game_details:
-                if game_details.get('description'):
-                    context += f"\nDescription: {game_details['description']}"
-                if game_details.get('tags'):
-                    context += f"\nGenres: {', '.join(game_details['tags'])}"
                 if game_details.get('developer'):
                     context += f"\nDeveloper: {game_details['developer']}"
                 if game_details.get('release_date'):
                     context += f"\nRelease Date: {game_details['release_date']}"
+                if game_details.get('description'):
+                    context += f"\nDescription: {game_details['description'][:200]}..."
+                if game_details.get('genres'):
+                    context += f"\nGenres: {', '.join(game_details['genres'][:3])}"
             
+            # Extract and format release date for script context
+            release_date_context = ""
+            if game_details and game_details.get('release_date'):
+                release_date = game_details['release_date']
+                if release_date and release_date != "Unknown":
+                    # Smart release date formatting for different formats
+                    release_lower = release_date.lower()
+                    
+                    # Handle different date formats
+                    if "2024" in release_date or "2025" in release_date or "2026" in release_date or "2027" in release_date:
+                        # Future releases
+                        if "coming soon" in release_lower or "tba" in release_lower:
+                            release_date_context = "coming soon"
+                        elif "q1" in release_lower or "q2" in release_lower or "q3" in release_lower or "q4" in release_lower:
+                            release_date_context = f"dropping {release_date}"
+                        elif "early access" in release_lower:
+                            release_date_context = f"in early access {release_date}"
+                        else:
+                            release_date_context = f"releasing {release_date}"
+                    elif "2023" in release_date or "2022" in release_date:
+                        # Recent releases
+                        release_date_context = f"now available since {release_date}"
+                    else:
+                        # Generic format
+                        release_date_context = f"available {release_date}"
+
             prompt = f"""
-            Create a short intro script for a YouTube Reel about the game "{game_title}".
+            Create a short intro script for a YouTube Reel about the game "{clean_game_title}".
             
             Requirements:
             - Exactly 2 sentences
             - Each sentence should be 5-8 words
             - Energetic and engaging tone
             - Build excitement for the game
+            - MUST include the release date if available: {release_date_context}
+            - If no release date, focus on game excitement and features
             - Keep it under 15 seconds when spoken
+            - Focus on upcoming releases and hype
+            - EXCLUDE all trademarks, logos, and symbols (™, ®, ©, TM)
+            - Do NOT include company names or trademark references
+            - Focus only on the game title and gameplay features
             
-            Examples: 
-            - "Get ready for epic battles! {game_title} delivers incredible action!"
-            - "This game changes everything! Experience {game_title} like never before!"
-            - "Prepare for the ultimate adventure! {game_title} awaits your challenge!"
+            Examples with release dates: 
+            - "{clean_game_title} drops this December! Get ready for epic adventures!"
+            - "Coming 2025, {clean_game_title} changes everything! Prepare for the ultimate experience!"
+            - "{clean_game_title} releases March 2024! This will blow your mind!"
+            - "Mark your calendars now! {clean_game_title} {release_date_context}!"
+            - "{clean_game_title} is {release_date_context}! Don't miss this incredible game!"
+            - "Get hyped gamers! {clean_game_title} {release_date_context}!"
             
             Context: {context}
             
@@ -72,7 +136,7 @@ class IntroGenerator:
                     messages=[
                         {
                             "role": "system",
-                            "content": "You are a gaming content creator who writes engaging, energetic intro scripts for YouTube Shorts about upcoming video games. Keep it under 15 seconds when spoken."
+                            "content": "You are a gaming content creator who writes engaging, energetic intro scripts for YouTube Shorts about upcoming video games. Always include release dates when available to create urgency and excitement. Focus on upcoming releases and build hype. Keep it under 15 seconds when spoken. NEVER include trademarks, logos, company names, or symbols like ™, ®, ©, TM. Focus only on game titles and gameplay features."
                         },
                         {
                             "role": "user", 
@@ -83,6 +147,10 @@ class IntroGenerator:
                     temperature=0.8
                 )
                 script = response.choices[0].message.content.strip()
+                
+                # Clean any trademark symbols that might have appeared
+                script = self._clean_trademark_symbols(script)
+                
             else:
                 logger.error("OpenAI API not available")
                 raise Exception("OpenAI API is required for script generation")
@@ -104,9 +172,9 @@ class IntroGenerator:
             }
             
             # HeyGen template-based payload - using updated template
-            template_id = "1ebac940efe64283ad0d1add1e0f72de"
+            template_id = "537836c8f0264d38b22e1225ad6945b9"
             payload = {
-                "test": False,  # Use test mode first
+                "test": True,  # Use test mode first
                 "caption": False,
                 "title": f"{game_title} Intro Video",
                 "variables": {

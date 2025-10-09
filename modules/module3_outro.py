@@ -23,14 +23,43 @@ class OutroGenerator:
             api_key=Config.CLOUDINARY_API_KEY,
             api_secret=Config.CLOUDINARY_API_SECRET
         )
+    
+    def _clean_trademark_symbols(self, script: str) -> str:
+        """Remove trademark symbols and company references from script (except allkeyshop.com)"""
+        import re
+        
+        # Remove trademark symbols
+        trademark_symbols = ['™', '®', '©', 'TM', 'SM', '(TM)', '(R)', '(C)']
+        for symbol in trademark_symbols:
+            script = script.replace(symbol, '')
+        
+        # Remove common company/trademark patterns (but preserve allkeyshop.com)
+        patterns_to_remove = [
+            r'\b(Inc\.?|LLC|Ltd\.?|Corporation|Corp\.?)\b',  # Company suffixes
+            r'\b(?!allkeyshop)(Studios?|Entertainment|Games?|Interactive)\b(?=\s|$)',  # Game company words (except allkeyshop)
+            r'\bTrademark\b',  # The word "Trademark"
+            r'\bAll rights reserved\b',  # Rights text
+        ]
+        
+        for pattern in patterns_to_remove:
+            script = re.sub(pattern, '', script, flags=re.IGNORECASE)
+        
+        # Clean up extra spaces and normalize
+        script = ' '.join(script.split())
+        
+        logger.info(f"Cleaned outro script of trademark symbols: {script}")
+        return script
         
     async def generate_outro_script(self, game_title: str, game_details: Dict = None) -> str:
         """Generate outro script using OpenAI"""
         try:
             logger.info(f"Generating outro script for {game_title}")
             
+            # Clean game title of trademark symbols before using in script
+            clean_game_title = self._clean_trademark_symbols(game_title)
+            
             # Create context from game details
-            context = f"Game: {game_title}"
+            context = f"Game: {clean_game_title}"
             if game_details:
                 if game_details.get('release_date'):
                     context += f"\nRelease Date: {game_details['release_date']}"
@@ -38,7 +67,7 @@ class OutroGenerator:
                     context += f"\nDeveloper: {game_details['developer']}"
             
             prompt = f"""
-            Create a very short 8-second outro script for a YouTube Reel about the game "{game_title}".
+            Create a very short 8-second outro script for a YouTube Reel about the game "{clean_game_title}".
             
             Context:
             {context}
@@ -49,6 +78,8 @@ class OutroGenerator:
             - Include a call-to-action (like, subscribe)
             - Use simple, direct language perfect for voice-over
             - No punctuation or complex sentences
+            - EXCLUDE all trademarks, logos, and symbols (™, ®, ©, TM)
+            - Do NOT include company names or trademark references beyond the required allkeyshop.com
             
             Example format: "Like and subscribe for more gaming! Visit allkeyshop.com - your games at the best price!"
             
@@ -60,13 +91,17 @@ class OutroGenerator:
                     self.openai_client.chat.completions.create,
                     model="gpt-3.5-turbo",
                     messages=[
-                        {"role": "system", "content": "You are a gaming content creator who writes engaging YouTube Reel outros with strong CTAs."},
+                        {"role": "system", "content": "You are a gaming content creator who writes engaging YouTube Reel outros with strong CTAs. NEVER include trademarks, logos, company names, or symbols like ™, ®, ©, TM beyond the required allkeyshop.com reference."},
                         {"role": "user", "content": prompt}
                     ],
                     max_tokens=150,
                     temperature=0.8
                 )
                 script = response.choices[0].message.content.strip()
+                
+                # Clean any trademark symbols that might have appeared
+                script = self._clean_trademark_symbols(script)
+                
             else:
                 logger.error("OpenAI API not available")
                 raise Exception("OpenAI API is required for script generation")
@@ -87,7 +122,7 @@ class OutroGenerator:
             }
             
             # HeyGen template-based payload for outro - using updated template
-            template_id = "1ebac940efe64283ad0d1add1e0f72de"
+            template_id = "537836c8f0264d38b22e1225ad6945b9"
             payload = {
                 "test": True,  # Use test mode first
                 "caption": False,
