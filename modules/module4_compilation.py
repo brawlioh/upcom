@@ -224,7 +224,7 @@ class CreatorMateCompiler:
                             "type": "image",
                             "track": 3,
                             "time": 0,
-                            "source": "https://res.cloudinary.com/dodod8s0v/image/upload/v1759738854/logo_1_jsyalg.png",
+                            "source": "https://res.cloudinary.com/dodod8s0v/image/upload/v1759927553/logo_2_xwogmb.png",
                             "animations": [
                                 {
                                     "time": 0,
@@ -248,7 +248,7 @@ class CreatorMateCompiler:
                             "time": "auto",
                             "duration": 3,
                             "fit": "cover",
-                            "source": "https://res.cloudinary.com/dodod8s0v/image/upload/v1759738854/outro_kpifba.png",
+                            "source": "https://res.cloudinary.com/dodod8s0v/image/upload/v1759926961/outro_2_crwy4x.png",
                             "animations": [
                                 {
                                     "time": 0,

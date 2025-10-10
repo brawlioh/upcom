@@ -27,6 +27,11 @@ class Config:
     STEAM_UPCOMING_URL = "https://store.steampowered.com/search/?filter=popularcomingsoon&os=win"
     STEAM_WISHLIST_URL = "https://steamdb.info/stats/mostwished/"
     
+    # Vizard Settings
+    VIZARD_USE_WEBHOOK = True  # Set to False to use polling only
+    VIZARD_WEBHOOK_TIMEOUT = 120  # seconds
+    VIZARD_POLLING_TIMEOUT = 1800  # 30 minutes
+    
     # HeyGen Settings
     HEYGEN_BASE_URL = "https://api.heygen.com/v2"
     
