@@ -174,7 +174,7 @@ class IntroGenerator:
             # HeyGen template-based payload - using updated template
             template_id = "537836c8f0264d38b22e1225ad6945b9"
             payload = {
-                "test": True,  # Use test mode first
+                "test": False,  # PRODUCTION: Use real HeyGen API
                 "caption": False,
                 "title": f"{game_title} Intro Video",
                 "variables": {
@@ -247,9 +247,9 @@ class IntroGenerator:
         
         while attempt < max_attempts:
             try:
-                # Use the video_status endpoint to check completion and get video URL
+                # Use the correct video status endpoint
                 async with session.get(
-                    f"https://api.heygen.com/v1/video_status.get?video_id={video_id}",
+                    f"https://api.heygen.com/v1/video_status/{video_id}",
                     headers=headers
                 ) as response:
                     if response.status == 200:
@@ -285,6 +285,12 @@ class IntroGenerator:
                             else:
                                 logger.warning(f"Video completed but no valid URL found in response. Available fields: {list(data.keys())}")
                                 logger.warning(f"Full response: {data}")
+                                
+                                # Try alternative endpoint for getting video details
+                                logger.info("Trying alternative video details endpoint...")
+                                alt_url = await self._try_alternative_video_endpoint(session, headers, video_id)
+                                if alt_url:
+                                    return alt_url
                         elif status == 'failed':
                             logger.error(f"HeyGen video generation failed: {data}")
                             raise Exception(f"HeyGen video generation failed: {data.get('error', 'Unknown error')}")
@@ -304,6 +310,53 @@ class IntroGenerator:
         
         logger.error("HeyGen video generation timed out")
         raise Exception("HeyGen video generation timed out after 10 minutes")
+    
+    async def _try_alternative_video_endpoint(self, session: aiohttp.ClientSession, headers: Dict, video_id: str) -> Optional[str]:
+        """Try alternative HeyGen endpoints to get video URL"""
+        alternative_endpoints = [
+            f"https://api.heygen.com/v1/video/{video_id}",
+            f"https://api.heygen.com/v2/video/{video_id}",
+            f"https://api.heygen.com/v1/video_status.get?video_id={video_id}",
+        ]
+        
+        for endpoint in alternative_endpoints:
+            try:
+                logger.info(f"Trying alternative endpoint: {endpoint}")
+                async with session.get(endpoint, headers=headers) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        logger.info(f"Alternative endpoint response: {result}")
+                        
+                        # Try to extract video URL from response
+                        data = result.get('data', result)
+                        
+                        # Look for video URL in various possible locations
+                        possible_paths = [
+                            ['video_url'],
+                            ['url'],
+                            ['download_url'],
+                            ['video', 'url'],
+                            ['video', 'video_url'],
+                            ['data', 'video_url'],
+                            ['data', 'url'],
+                        ]
+                        
+                        for path in possible_paths:
+                            current = data
+                            try:
+                                for key in path:
+                                    current = current[key]
+                                if isinstance(current, str) and current.startswith('http'):
+                                    logger.info(f"Found video URL via alternative endpoint: {current}")
+                                    return current
+                            except (KeyError, TypeError):
+                                continue
+                                
+            except Exception as e:
+                logger.warning(f"Alternative endpoint {endpoint} failed: {e}")
+                continue
+        
+        return None
     
     async def _download_video(self, session: aiohttp.ClientSession, video_url: str, game_title: str, module_type: str) -> Optional[str]:
         """Download video from URL, save locally, and upload to Cloudinary"""
