@@ -569,14 +569,13 @@ class VizardProcessor:
                     logger.info(f"✅ Found backup video for {game_title}: {url}")
                     return url
             
-            # Default fallback - use a generic gaming video
-            default_url = "https://www.youtube.com/watch?v=8X2kIfS6fb8"  # Cyberpunk gameplay
-            logger.info(f"🎮 Using default gaming video: {default_url}")
-            return default_url
+            # PRODUCTION: No fallback URLs - require real gameplay footage
+            logger.error(f"❌ No gameplay videos found for {game_title} in production")
+            raise Exception(f"No gameplay videos found for {game_title}. Please provide custom_video_url or ensure Steam game has available footage.")
             
         except Exception as e:
-            logger.error(f"Error in YouTube search fallback: {e}")
-            return "https://www.youtube.com/watch?v=8X2kIfS6fb8"  # Safe fallback
+            logger.error(f"Error in YouTube search: {e}")
+            raise Exception(f"YouTube search failed for {game_title}: {e}")
     
     
     async def get_multiple_clips(self, game_title: str, count: int = 3) -> List[str]:
