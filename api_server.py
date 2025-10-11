@@ -14,10 +14,16 @@ from main import YouTubeReelsAutomation
 
 app = FastAPI(title="YouTube Reels Automation API", version="1.0.0")
 
-# Add CORS middleware
+# Add CORS middleware - works for both local and Railway deployment
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"],  # Frontend URLs
+    allow_origins=[
+        "http://localhost:3000", 
+        "http://localhost:3001", 
+        "http://localhost:3002",
+        "https://*.railway.app",  # Railway frontend domains
+        "*"  # Allow all origins for Railway deployment
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
