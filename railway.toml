@@ -2,17 +2,19 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "python railway_main.py"
+startCommand = "python3 railway_main.py"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 
-# Specify which requirements file to use
+# Specify which requirements file to use and Python version
 [build.env]
 NIXPACKS_PYTHON_REQUIREMENTS_FILE = "requirements-railway.txt"
+NIXPACKS_PYTHON_VERSION = "3.11"
 
 [env]
 # Railway will use your environment variables from the dashboard
 # These are fallback values that match your local setup
 PORT = "8001"
 PYTHONPATH = "."
+RAILWAY_ENVIRONMENT = "true"

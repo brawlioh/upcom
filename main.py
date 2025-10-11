@@ -7,7 +7,12 @@ from pathlib import Path
 from loguru import logger
 from config import Config
 from typing import Dict, List, Optional
-from utils.steam_scraper import SteamScraper
+# Use Railway-compatible scraper for deployment
+import os
+if os.environ.get('RAILWAY_ENVIRONMENT'):
+    from utils.steam_scraper_railway import SteamScraper
+else:
+    from utils.steam_scraper import SteamScraper
 from modules.module1_intro import IntroGenerator
 from modules.module2_vizard import VizardProcessor
 from modules.module3_outro import OutroGenerator
