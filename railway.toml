@@ -7,6 +7,10 @@ healthcheckPath = "/api/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 
+# Specify which requirements file to use
+[build.env]
+NIXPACKS_PYTHON_REQUIREMENTS_FILE = "requirements-railway.txt"
+
 [env]
 # Railway will use your environment variables from the dashboard
 # These are fallback values that match your local setup
