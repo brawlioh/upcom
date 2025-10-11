@@ -25,7 +25,7 @@ interface AutomationRequest {
   count?: number
 }
 
-const API_BASE_URL = 'http://localhost:8001/api'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api'
 
 export function useAutomation() {
   const [currentJob, setCurrentJob] = useState<AutomationJob | null>(null)
@@ -34,7 +34,8 @@ export function useAutomation() {
 
   // WebSocket connection for real-time updates
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8001/ws')
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8001/ws'
+    const ws = new WebSocket(wsUrl)
     
     ws.onopen = () => {
       setIsConnected(true)
