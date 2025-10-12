@@ -241,72 +241,72 @@ class IntroGenerator:
             raise Exception(f"HeyGen video generation failed: {e}")
     
     async def _poll_heygen_status(self, session: aiohttp.ClientSession, headers: Dict, video_id: str) -> Optional[str]:
-        """Poll HeyGen API for video completion status using /video_status/{video_id} endpoint"""
+        """Poll HeyGen API for video completion status - try multiple endpoint formats"""
         max_attempts = 120  # 10 minutes with 5-second intervals
         attempt = 0
         
+        # Try different endpoint formats that HeyGen might use
+        status_endpoints = [
+            f"https://api.heygen.com/v1/video_status/{video_id}",
+            f"https://api.heygen.com/v2/video/{video_id}",
+            f"https://api.heygen.com/v1/video/{video_id}",
+            f"https://api.heygen.com/v1/video_status.get?video_id={video_id}",
+        ]
+        
         while attempt < max_attempts:
-            try:
-                # Use the correct video status endpoint
-                async with session.get(
-                    f"https://api.heygen.com/v1/video_status/{video_id}",
-                    headers=headers
-                ) as response:
-                    if response.status == 200:
-                        result = await response.json()
-                        data = result.get('data', {})
-                        status = data.get('status')
-                        
-                        logger.info(f"HeyGen status check {attempt + 1}: {status}")
-                        
-                        if status == 'completed':
-                            # Look for video URL in multiple possible locations
-                            video_url = None
+            for endpoint_url in status_endpoints:
+                try:
+                    logger.info(f"Trying HeyGen status endpoint: {endpoint_url}")
+                    async with session.get(endpoint_url, headers=headers) as response:
+                        if response.status == 200:
+                            result = await response.json()
+                            data = result.get('data', result)  # Handle both formats
+                            status = data.get('status')
                             
-                            # Try different possible field names for video URL
-                            possible_fields = ['video_url', 'url', 'download_url', 'file_url', 'video']
-                            for field in possible_fields:
-                                if field in data and data[field]:
-                                    video_url = data[field]
-                                    break
+                            logger.info(f"HeyGen status check {attempt + 1} on {endpoint_url}: {status}")
+                            logger.info(f"Full response: {result}")
                             
-                            # Also check if there's a nested structure
-                            if not video_url and 'video' in data and isinstance(data['video'], dict):
-                                for field in possible_fields:
-                                    if field in data['video'] and data['video'][field]:
-                                        video_url = data['video'][field]
-                                        break
-                            
-                            logger.info(f"Full HeyGen response data: {data}")
-                            
-                            if video_url and isinstance(video_url, str) and video_url.startswith('http'):
-                                logger.info(f"HeyGen video completed: {video_url}")
-                                return video_url
-                            else:
-                                logger.warning(f"Video completed but no valid URL found in response. Available fields: {list(data.keys())}")
-                                logger.warning(f"Full response: {data}")
+                            if status == 'completed':
+                                # Look for video URL in multiple possible locations
+                                video_url = None
                                 
-                                # Try alternative endpoint for getting video details
-                                logger.info("Trying alternative video details endpoint...")
-                                alt_url = await self._try_alternative_video_endpoint(session, headers, video_id)
-                                if alt_url:
-                                    return alt_url
-                        elif status == 'failed':
-                            logger.error(f"HeyGen video generation failed: {data}")
-                            raise Exception(f"HeyGen video generation failed: {data.get('error', 'Unknown error')}")
+                                # Try different possible field names for video URL
+                                possible_fields = ['video_url', 'url', 'download_url', 'file_url', 'video']
+                                for field in possible_fields:
+                                    if field in data and data[field]:
+                                        video_url = data[field]
+                                        break
+                                
+                                # Also check if there's a nested structure
+                                if not video_url and 'video' in data and isinstance(data['video'], dict):
+                                    for field in possible_fields:
+                                        if field in data['video'] and data['video'][field]:
+                                            video_url = data['video'][field]
+                                            break
+                                
+                                if video_url and isinstance(video_url, str) and video_url.startswith('http'):
+                                    logger.info(f"✅ Found HeyGen video URL via {endpoint_url}: {video_url}")
+                                    return video_url
+                                else:
+                                    logger.warning(f"Video completed but no valid URL found. Available fields: {list(data.keys())}")
+                                    
+                            elif status == 'failed':
+                                logger.error(f"HeyGen video generation failed: {data}")
+                                raise Exception(f"HeyGen video generation failed: {data.get('error', 'Unknown error')}")
+                            elif status:
+                                logger.info(f"HeyGen video still processing, status: {status}")
+                                break  # Break from endpoint loop, try again with same endpoints
                         else:
-                            logger.info(f"HeyGen video still processing, status: {status}")
-                    else:
-                        response_text = await response.text()
-                        logger.warning(f"HeyGen status API response {response.status}: {response_text}")
-                
-                await asyncio.sleep(5)
-                attempt += 1
-                
-            except Exception as e:
-                logger.error(f"Error polling HeyGen status: {e}")
-                await asyncio.sleep(5)
-                attempt += 1
+                            response_text = await response.text()
+                            logger.warning(f"HeyGen endpoint {endpoint_url} returned {response.status}: {response_text}")
+                            
+                except Exception as e:
+                    logger.warning(f"Error with endpoint {endpoint_url}: {e}")
+                    continue
+            
+            # If we get here, none of the endpoints worked for this attempt
+            await asyncio.sleep(5)
+            attempt += 1
         
         logger.error("HeyGen video generation timed out")
         raise Exception("HeyGen video generation timed out after 10 minutes")
