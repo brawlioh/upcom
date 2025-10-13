@@ -173,17 +173,35 @@ class YouTubeReelsAutomation:
             # Module 4: Compile Final Reel
             self.update_progress(4, "Compiling final reel with Creatomate")
             self.show_loading_animation("Combining all segments into final video", 4)
-            final_reel_path = await self.compiler.compile_reel(intro_path, vizard_path, outro_path, game_title)
+            compilation_result = await self.compiler.compile_reel(intro_path, vizard_path, outro_path, game_title)
+            
+            # Handle both old string format and new dict format
+            if isinstance(compilation_result, dict):
+                final_reel_path = compilation_result.get('local_path')
+                online_url = compilation_result.get('online_url')
+                logger.info(f"📺 Online video URL: {online_url}")
+            else:
+                # Backward compatibility - old string return format
+                final_reel_path = compilation_result
+                online_url = None
             
             # Success notification
             total_time = time.time() - self.start_time
             print(f"\n🎉 SUCCESS! Reel created in {total_time:.1f} seconds")
             print(f"📁 Final reel: {final_reel_path}")
+            if online_url:
+                print(f"🌐 Online URL: {online_url}")
             
             # Webhook notification removed
             
             logger.info(f"✅ Successfully created reel: {final_reel_path}")
-            return final_reel_path
+            
+            # Return the result in a format the API can use
+            return {
+                'local_path': final_reel_path,
+                'online_url': online_url,
+                'display_path': final_reel_path  # For backward compatibility
+            } if online_url else final_reel_path
             
         except Exception as e:
             error_msg = f"Error creating reel for {game_title}: {e}"

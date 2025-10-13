@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Video, Monitor, Image, Settings } from 'lucide-react'
+import { Video } from 'lucide-react'
 import { useAutomation } from './hooks/useAutomation'
 import AutomationControl from './components/AutomationControl'
 import ProgressTracker from './components/ProgressTracker'
@@ -65,41 +65,6 @@ export default function Home() {
 
           {/* Sidebar */}
           <div className="space-y-2.5">
-            {/* Module Status */}
-            <div className="card">
-              <h3 className="text-lg font-semibold text-white mb-2">Module Status</h3>
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Video className="w-4 h-4 text-primary-400" />
-                    <span className="text-sm text-white">Intro (HeyGen)</span>
-                  </div>
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Monitor className="w-4 h-4 text-primary-400" />
-                    <span className="text-sm text-white">Gameplay (Vizard)</span>
-                  </div>
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Image className="w-4 h-4 text-primary-400" />
-                    <span className="text-sm text-white">Outro (HeyGen)</span>
-                  </div>
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Settings className="w-4 h-4 text-primary-400" />
-                    <span className="text-sm text-white">Compile (Creatomate)</span>
-                  </div>
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                </div>
-              </div>
-            </div>
-
             {/* Recent Reels */}
             <RecentReels />
           </div>

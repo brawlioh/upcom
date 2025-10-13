@@ -13,6 +13,7 @@ interface AutomationJob {
   created_at: string
   completed_at?: string
   result_path?: string
+  online_url?: string  // Added for Creatomate video URLs
   error_message?: string
   request?: AutomationRequest
 }

@@ -153,21 +153,6 @@ export default function AutomationControl({ isRunning, setIsRunning, setCurrentS
         </button>
       </div>
 
-      {/* Quick Actions */}
-      <div className="mt-4 pt-4 border-t border-dark-700">
-        <p className="text-sm text-dark-400 mb-2">Quick Actions</p>
-        <div className="flex space-x-2">
-          <button className="text-xs bg-dark-700 hover:bg-dark-600 text-dark-300 px-3 py-1 rounded">
-            Test Module 1
-          </button>
-          <button className="text-xs bg-dark-700 hover:bg-dark-600 text-dark-300 px-3 py-1 rounded">
-            Test Module 2
-          </button>
-          <button className="text-xs bg-dark-700 hover:bg-dark-600 text-dark-300 px-3 py-1 rounded">
-            View Logs
-          </button>
-        </div>
-      </div>
     </div>
   )
 }

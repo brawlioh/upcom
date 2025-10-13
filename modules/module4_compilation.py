@@ -296,7 +296,15 @@ class CreatorMateCompiler:
                             if final_url:
                                 # Download final video
                                 output_path = await self._download_final_video(session, final_url, game_title)
-                                return output_path
+                                
+                                # Store both local path and online URL for frontend access
+                                result = {
+                                    'local_path': output_path,
+                                    'online_url': final_url,
+                                    'creatomate_url': final_url
+                                }
+                                logger.info(f"✅ Compilation complete - Local: {output_path}, Online: {final_url}")
+                                return result
                         else:
                             logger.error("No render ID returned from Creatomate")
                             raise Exception("Creatomate API did not return a render ID")

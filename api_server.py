@@ -151,13 +151,23 @@ async def run_automation_job(job_id: str, request: AutomationRequest):
         # Job completed successfully
         automation_jobs[job_id]['status'] = 'completed'
         automation_jobs[job_id]['completed_at'] = datetime.now().isoformat()
-        automation_jobs[job_id]['result_path'] = result
         automation_jobs[job_id]['progress'] = 100
+        
+        # Handle both old string format and new dict format
+        if isinstance(result, dict):
+            automation_jobs[job_id]['result_path'] = result.get('local_path')
+            automation_jobs[job_id]['online_url'] = result.get('online_url')
+            result_for_broadcast = result.get('online_url') or result.get('local_path')
+        else:
+            automation_jobs[job_id]['result_path'] = result
+            automation_jobs[job_id]['online_url'] = None
+            result_for_broadcast = result
         
         await manager.broadcast(json.dumps({
             'type': 'job_completed',
             'job_id': job_id,
-            'result_path': result
+            'result_path': result_for_broadcast,
+            'online_url': automation_jobs[job_id].get('online_url')
         }))
         
     except Exception as e:

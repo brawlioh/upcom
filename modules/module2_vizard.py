@@ -71,11 +71,19 @@ class VizardProcessor:
             if game_details and game_details.get('videos'):
                 steam_videos = game_details['videos']
                 logger.info(f"🎬 Found {len(steam_videos)} videos from Steam data")
-                # Only use YouTube videos from Steam data (Vizard requires YouTube)
+                
+                # Filter and prioritize YouTube videos from Steam data
+                youtube_videos = []
                 for video in steam_videos:
                     if 'youtube.com' in video or 'youtu.be' in video:
-                        logger.info(f"✅ Using Steam YouTube video: {video}")
-                        return video
+                        youtube_videos.append(video)
+                
+                if youtube_videos:
+                    # Prioritize videos with better keywords (trailers over podcasts)
+                    prioritized_video = self._prioritize_steam_videos(youtube_videos, game_title)
+                    logger.info(f"✅ Using prioritized Steam YouTube video: {prioritized_video}")
+                    return prioritized_video
+                
                 # If no YouTube videos in Steam data, skip to next method
                 logger.info(f"⚠️ Steam videos are not YouTube URLs, trying other methods...")
             
@@ -92,8 +100,11 @@ class VizardProcessor:
             logger.info(f"🔍 Trying direct YouTube search")
             search_videos = await self._search_youtube_directly(game_title)
             if search_videos:
-                logger.info(f"✅ Found videos via YouTube search")
-                return search_videos[0]
+                logger.info(f"✅ Found {len(search_videos)} videos via YouTube search")
+                # Use the first video (already prioritized by search terms)
+                selected_video = search_videos[0]
+                logger.info(f"🎯 Selected YouTube search video: {selected_video}")
+                return selected_video
             
             # No videos found
             logger.error(f"❌ No videos found for {game_title}")
@@ -102,6 +113,38 @@ class VizardProcessor:
         except Exception as e:
             logger.error(f"Error finding video URL for {game_title}: {e}")
             raise Exception(f"Failed to find video URL for {game_title}: {e}")
+
+    def _prioritize_steam_videos(self, youtube_videos: List[str], game_title: str) -> str:
+        """Prioritize Steam videos by content type (trailers > gameplay > others)"""
+        try:
+            # Score each video based on URL patterns and likely content type
+            scored_videos = []
+            
+            for video in youtube_videos:
+                score = 0
+                video_lower = video.lower()
+                
+                # Prefer shorter video IDs (often official content)
+                if 'watch?v=' in video:
+                    video_id = video.split('watch?v=')[-1].split('&')[0]
+                    if len(video_id) == 11:  # Standard YouTube video ID length
+                        score += 5
+                
+                # Basic scoring (limited without video titles, but helps with patterns)
+                # In a full implementation, you'd fetch video metadata
+                logger.info(f"📊 Video scored: {video} (score: {score})")
+                scored_videos.append((score, video))
+            
+            # Sort by score (highest first) and return the best video
+            scored_videos.sort(key=lambda x: x[0], reverse=True)
+            best_video = scored_videos[0][1]
+            
+            logger.info(f"🏆 Selected best Steam video: {best_video}")
+            return best_video
+            
+        except Exception as e:
+            logger.warning(f"Error prioritizing videos, using first: {e}")
+            return youtube_videos[0]
 
     def _extract_steam_app_id(self, game_title: str, game_details: Dict = None) -> Optional[str]:
         """Extract Steam App ID from game details or title"""

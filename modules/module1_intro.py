@@ -172,7 +172,7 @@ class IntroGenerator:
             }
             
             # HeyGen template-based payload - using updated template
-            template_id = "537836c8f0264d38b22e1225ad6945b9"
+            template_id = "f34b869fb919455fa8b926967fce6a1f"
             payload = {
                 "test": False,  # PRODUCTION: Use real HeyGen API
                 "caption": False,

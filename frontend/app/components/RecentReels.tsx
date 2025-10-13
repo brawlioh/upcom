@@ -61,7 +61,7 @@ export default function RecentReels() {
           status: job.status as 'completed' | 'processing' | 'failed',
           createdAt: timeAgo,
           duration: job.status === 'completed' ? '~60s' : '—',
-          downloadUrl: job.result_path
+          downloadUrl: job.online_url || job.result_path  // Prefer online URL for viewing
         }
       })
 
@@ -137,6 +137,78 @@ export default function RecentReels() {
       </div>
 
       <div className="space-y-2">
+        {/* Show latest completed video preview if available */}
+        {reels.length > 0 && reels[0].status === 'completed' && (
+          <div className="mb-4 p-3 bg-dark-700/30 rounded-lg border border-green-500/20">
+            <div className="flex items-center space-x-2 mb-2">
+              <CheckCircle className="w-4 h-4 text-green-400" />
+              <span className="text-sm font-medium text-green-400">Latest Completed Reel</span>
+            </div>
+            <div className="bg-dark-800 rounded-lg p-2">
+              <p className="text-white font-medium mb-2">{reels[0].title}</p>
+              {/* Video preview - portrait orientation for reels */}
+              {reels[0].downloadUrl && reels[0].downloadUrl.includes('http') ? (
+                <div className="w-full flex justify-center mb-2">
+                  <div className="w-48 h-64 bg-dark-600 rounded-lg overflow-hidden shadow-lg">
+                    <video 
+                      className="w-full h-full object-cover"
+                      controls
+                      preload="metadata"
+                      poster=""
+                      style={{ aspectRatio: '9/16' }}
+                    >
+                      <source src={reels[0].downloadUrl} type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </video>
+                  </div>
+                </div>
+              ) : (
+                <div className="w-full flex justify-center mb-2">
+                  <div className="w-48 h-64 bg-dark-600 rounded-lg flex items-center justify-center shadow-lg">
+                    <div className="text-center">
+                      <Play className="w-12 h-12 text-primary-400 mx-auto mb-2" />
+                      <p className="text-sm text-dark-400 font-medium">Video Preview</p>
+                      <p className="text-xs text-dark-500">Portrait reel format</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-dark-400">{reels[0].createdAt} • {reels[0].duration}</span>
+                <div className="flex space-x-2">
+                  <button 
+                    className="px-3 py-1 bg-primary-600 hover:bg-primary-700 text-white text-xs rounded-md transition-colors"
+                    onClick={() => {
+                      if (reels[0].downloadUrl) {
+                        // Open video in new tab or download
+                        window.open(reels[0].downloadUrl, '_blank')
+                      }
+                    }}
+                  >
+                    <Play className="w-3 h-3 inline mr-1" />
+                    View
+                  </button>
+                  <button 
+                    className="px-3 py-1 bg-dark-600 hover:bg-dark-500 text-white text-xs rounded-md transition-colors"
+                    onClick={() => {
+                      if (reels[0].downloadUrl) {
+                        // Download the video
+                        const link = document.createElement('a')
+                        link.href = reels[0].downloadUrl
+                        link.download = `${reels[0].title}_final_reel.mp4`
+                        link.click()
+                      }
+                    }}
+                  >
+                    <Download className="w-3 h-3 inline mr-1" />
+                    Download
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {reels.map((reel) => (
           <div
             key={reel.id}
@@ -172,10 +244,27 @@ export default function RecentReels() {
             <div className="flex items-center space-x-1 flex-shrink-0">
               {reel.status === 'completed' && reel.downloadUrl && (
                 <>
-                  <button className="p-1 text-dark-400 hover:text-white transition-colors">
+                  <button 
+                    className="p-1 text-dark-400 hover:text-white transition-colors"
+                    onClick={() => {
+                      if (reel.downloadUrl) {
+                        const link = document.createElement('a')
+                        link.href = reel.downloadUrl
+                        link.download = `${reel.title}_final_reel.mp4`
+                        link.click()
+                      }
+                    }}
+                  >
                     <Download className="w-4 h-4" />
                   </button>
-                  <button className="p-1 text-dark-400 hover:text-white transition-colors">
+                  <button 
+                    className="p-1 text-dark-400 hover:text-white transition-colors"
+                    onClick={() => {
+                      if (reel.downloadUrl) {
+                        window.open(reel.downloadUrl, '_blank')
+                      }
+                    }}
+                  >
                     <ExternalLink className="w-4 h-4" />
                   </button>
                 </>
