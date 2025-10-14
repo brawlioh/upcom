@@ -32,6 +32,17 @@ class Config:
     VIZARD_WEBHOOK_TIMEOUT = 120  # seconds
     VIZARD_POLLING_TIMEOUT = 1800  # 30 minutes
     
+    # Enhanced Vizard Text Handling Settings
+    VIZARD_ENABLE_TEXT_DETECTION = True  # Enable text detection for better cropping
+    VIZARD_PREFER_TEXT_HEAVY_TEMPLATES = True  # Prefer templates optimized for text
+    VIZARD_MIN_CLIP_DURATION = 30  # Minimum clip duration in seconds
+    VIZARD_MAX_CLIP_DURATION = 75  # Maximum clip duration in seconds
+    VIZARD_OPTIMAL_CLIP_DURATION = 50  # Optimal clip duration in seconds
+    VIZARD_QUALITY_PREFERENCE = "high"  # Preferred video quality
+    VIZARD_ASPECT_RATIO = "9:16"  # Preferred aspect ratio for mobile
+    VIZARD_CROP_MODE = "smart"  # Smart cropping to preserve important content
+    VIZARD_MAX_CLIPS_TO_GENERATE = 4  # Generate more clips for better selection
+    
     # HeyGen Settings
     HEYGEN_BASE_URL = "https://api.heygen.com/v2"
     

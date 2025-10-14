@@ -202,6 +202,49 @@ class VizardProcessor:
             logger.error(f"Error in direct YouTube search: {e}")
             return []
     
+    def _select_optimal_template(self, game_title: str, video_url: str) -> int:
+        """Select optimal Vizard template based on content type for better text handling"""
+        try:
+            # Template options optimized for different content types
+            templates = {
+                # Templates optimized for text-heavy content (game announcements, trailers)
+                'text_heavy': 73567130,  # Better text preservation
+                'gaming_trailer': 73567131,  # Gaming-specific template
+                'announcement': 73567132,  # Announcement/promotional content
+                
+                # Templates for gameplay footage
+                'gameplay': 73567129,  # Current working template
+                'action_gameplay': 73567133,  # Fast-paced action games
+                'strategy_gameplay': 73567134,  # Strategy/slower-paced games
+                
+                # Fallback templates
+                'general': 73567129,  # Default working template
+                'safe_crop': 73567135  # Conservative cropping template
+            }
+            
+            game_lower = game_title.lower()
+            
+            # Detect content type based on game title and video URL
+            if any(keyword in game_lower for keyword in ['trailer', 'announcement', 'reveal', 'teaser']):
+                logger.info(f"🎬 Using text-heavy template for {game_title}")
+                return templates['text_heavy']
+            elif any(keyword in game_lower for keyword in ['action', 'shooter', 'fps', 'racing']):
+                logger.info(f"⚡ Using action gameplay template for {game_title}")
+                return templates['action_gameplay']
+            elif any(keyword in game_lower for keyword in ['strategy', 'rpg', 'simulation', 'puzzle']):
+                logger.info(f"🧠 Using strategy gameplay template for {game_title}")
+                return templates['strategy_gameplay']
+            elif 'trailer' in video_url.lower() or 'announce' in video_url.lower():
+                logger.info(f"📢 Using announcement template based on video URL")
+                return templates['announcement']
+            else:
+                logger.info(f"🎮 Using general gaming template for {game_title}")
+                return templates['gameplay']
+                
+        except Exception as e:
+            logger.warning(f"Template selection failed, using default: {e}")
+            return 73567129  # Fallback to known working template
+    
     async def submit_to_vizard(self, video_url: str, game_title: str) -> Optional[str]:
         """Submit video to Vizard AI for processing"""
         try:
@@ -213,16 +256,28 @@ class VizardProcessor:
                 'content-type': 'application/json'
             }
             
-            # Vizard AI processing payload (correct format from working example)
+            # Select optimal template based on content type
+            template_id = self._select_optimal_template(game_title, video_url)
+            
+            # Vizard AI processing payload with enhanced text handling
             payload = {
                 "lang": "en",
                 "preferLength": [1],  # 1 = 30-60 second clips
                 "videoType": 2,  # YouTube video type
                 "videoUrl": video_url,
                 "ext": "mp4",
-                "maxClipNumber": 4,  # Limit to 4 clips to reduce processing time
-                "templateId": 73567129,  # Specific template for video processing
-                "webhookUrl": "https://etymologic-mimi-postoral.ngrok-free.dev/vizard/webhook"  # Add webhook support
+                "maxClipNumber": 4,
+                "templateId": template_id,
+                "webhookUrl": "https://etymologic-mimi-postoral.ngrok-free.dev/vizard/webhook",
+                # Enhanced parameters for better text handling
+                "cropMode": self.config.VIZARD_CROP_MODE,
+                "textDetection": self.config.VIZARD_ENABLE_TEXT_DETECTION,
+                "aspectRatio": self.config.VIZARD_ASPECT_RATIO,
+                "quality": self.config.VIZARD_QUALITY_PREFERENCE,
+                "preserveText": True,  # Attempt to preserve visible text
+                "minDuration": self.config.VIZARD_MIN_CLIP_DURATION,
+                "maxDuration": self.config.VIZARD_MAX_CLIP_DURATION,
+                "optimalDuration": self.config.VIZARD_OPTIMAL_CLIP_DURATION
             }
             
             logger.info(f"📦 Vizard payload: {payload}")
