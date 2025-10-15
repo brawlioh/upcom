@@ -247,3 +247,4 @@ For issues and questions:
 ---
 
 **Happy Reel Creating! 🎬🎮**
+# Force Railway redeploy with validation fixes - Wed Oct 15 18:01:05 PST 2025
