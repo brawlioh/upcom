@@ -33,7 +33,7 @@ export default function RecentReels() {
         let title = 'Unknown Game'
         if (job.request?.game_title) {
           title = job.request.game_title
-        } else if (job.result_path) {
+        } else if (job.result_path && typeof job.result_path === 'string') {
           // Extract from file path like "Battlefield 6_final_reel.mp4"
           const filename = job.result_path.split('/').pop() || ''
           title = filename.replace('_final_reel.mp4', '')
