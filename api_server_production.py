@@ -1,14 +1,17 @@
 import asyncio
 import json
 import uuid
+import re
 from datetime import datetime
 from typing import Dict, List, Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from loguru import logger
 import uvicorn
 import os
+import aiohttp
+import ssl
 
 # Import your existing automation system
 from main import YouTubeReelsAutomation
@@ -34,12 +37,129 @@ app.add_middleware(
 automation_jobs: Dict[str, Dict] = {}
 active_connections: List[WebSocket] = []
 
+# Input validation functions
+async def validate_steam_app_id(app_id: str) -> Dict:
+    """Validate Steam App ID and return game details if valid"""
+    try:
+        # Basic format validation
+        if not app_id or not app_id.strip():
+            raise ValueError("Steam App ID cannot be empty")
+        
+        # Remove any whitespace and validate format
+        app_id = app_id.strip()
+        
+        # Steam App IDs should be numeric
+        if not re.match(r'^\d+$', app_id):
+            raise ValueError("Steam App ID must be numeric (e.g., 1962700)")
+        
+        # Check if App ID is reasonable (Steam IDs are typically 6+ digits)
+        if len(app_id) < 3:
+            raise ValueError("Steam App ID too short - please provide a valid Steam App ID")
+        
+        if len(app_id) > 10:
+            raise ValueError("Steam App ID too long - please check the App ID")
+        
+        logger.info(f"🔍 Validating Steam App ID: {app_id}")
+        
+        # Test Steam API connectivity and game existence
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+        async with aiohttp.ClientSession(connector=connector) as session:
+            # Try Steam Store API first
+            steam_api_url = f"https://store.steampowered.com/api/appdetails?appids={app_id}"
+            
+            try:
+                async with session.get(steam_api_url, timeout=10) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        
+                        if app_id in data and data[app_id].get('success'):
+                            game_data = data[app_id]['data']
+                            game_name = game_data.get('name', 'Unknown Game')
+                            game_type = game_data.get('type', 'unknown')
+                            
+                            # Validate it's actually a game (not DLC, software, etc.)
+                            if game_type.lower() not in ['game', 'demo']:
+                                raise ValueError(f"Steam App ID {app_id} is not a game (type: {game_type}). Please provide a game App ID.")
+                            
+                            logger.info(f"✅ Valid Steam game found: {game_name} (App ID: {app_id})")
+                            
+                            return {
+                                'app_id': app_id,
+                                'name': game_name,
+                                'type': game_type,
+                                'valid': True
+                            }
+                        else:
+                            raise ValueError(f"Steam App ID {app_id} not found. Please check the App ID and try again.")
+                    else:
+                        raise ValueError(f"Unable to validate Steam App ID {app_id}. Steam API returned status {response.status}.")
+            
+            except asyncio.TimeoutError:
+                raise ValueError("Steam API request timed out. Please check your internet connection and try again.")
+            except aiohttp.ClientError as e:
+                raise ValueError(f"Network error while validating Steam App ID: {str(e)}")
+    
+    except ValueError:
+        raise  # Re-raise validation errors
+    except Exception as e:
+        logger.error(f"Unexpected error validating Steam App ID {app_id}: {e}")
+        raise ValueError(f"Failed to validate Steam App ID {app_id}: {str(e)}")
+
+def validate_youtube_url(url: str) -> bool:
+    """Validate YouTube URL format"""
+    if not url:
+        return True  # Optional field
+    
+    youtube_patterns = [
+        r'https?://(?:www\.)?youtube\.com/watch\?v=[\w-]+',
+        r'https?://(?:www\.)?youtube\.com/shorts/[\w-]+',
+        r'https?://youtu\.be/[\w-]+'
+    ]
+    
+    return any(re.match(pattern, url) for pattern in youtube_patterns)
+
 class AutomationRequest(BaseModel):
     mode: str  # 'steam' only
     game_title: Optional[str] = None
     steam_app_id: Optional[str] = None
     custom_video_url: Optional[str] = None
     count: Optional[int] = 1
+    
+    @validator('mode')
+    def validate_mode(cls, v):
+        if v != 'steam':
+            raise ValueError("Only 'steam' mode is currently supported")
+        return v
+    
+    @validator('steam_app_id')
+    def validate_steam_id_format(cls, v):
+        if v is None:
+            raise ValueError("Steam App ID is required")
+        
+        v = v.strip() if v else ""
+        if not v:
+            raise ValueError("Steam App ID cannot be empty")
+        
+        if not re.match(r'^\d+$', v):
+            raise ValueError("Steam App ID must be numeric")
+        
+        return v
+    
+    @validator('custom_video_url')
+    def validate_video_url(cls, v):
+        if v and not validate_youtube_url(v):
+            raise ValueError("Custom video URL must be a valid YouTube URL")
+        return v
+    
+    @validator('count')
+    def validate_count(cls, v):
+        if v is not None and (v < 1 or v > 5):
+            raise ValueError("Count must be between 1 and 5")
+        return v or 1
 
 class JobStatus(BaseModel):
     job_id: str
@@ -93,27 +213,80 @@ validate_production_environment()
 
 @app.post("/api/automation/start")
 async def start_automation(request: AutomationRequest, background_tasks: BackgroundTasks):
-    """Start automation job - PRODUCTION VERSION (Real APIs only)"""
-    job_id = str(uuid.uuid4())
-    
-    # Create job record
-    automation_jobs[job_id] = {
-        'job_id': job_id,
-        'status': 'queued',
-        'progress': 0,
-        'current_step': 0,
-        'total_steps': 4,
-        'step_name': 'Initializing...',
-        'created_at': datetime.now().isoformat(),
-        'request': request.dict()
-    }
-    
-    # Start background task
-    background_tasks.add_task(run_automation_job, job_id, request)
-    
-    logger.info(f"🚀 PRODUCTION: Started automation job {job_id} for {request.mode} mode")
-    
-    return {"job_id": job_id, "status": "queued"}
+    """Start automation job with comprehensive validation - PRODUCTION VERSION"""
+    try:
+        logger.info(f"🚀 PRODUCTION: Starting automation request: {request.model_dump()}")
+        
+        # Validate Steam App ID and get game details
+        if request.mode == 'steam':
+            if not request.steam_app_id:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Steam App ID is required for steam mode"
+                )
+            
+            # Comprehensive Steam App ID validation
+            try:
+                validation_result = await validate_steam_app_id(request.steam_app_id)
+                logger.info(f"✅ PRODUCTION: Steam validation passed: {validation_result['name']}")
+            except ValueError as e:
+                logger.error(f"❌ PRODUCTION: Steam validation failed: {e}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid Steam App ID: {str(e)}"
+                )
+            except Exception as e:
+                logger.error(f"❌ PRODUCTION: Unexpected validation error: {e}")
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to validate Steam App ID. Please try again later."
+                )
+        
+        # Additional validation for custom video URL
+        if request.custom_video_url:
+            if not validate_youtube_url(request.custom_video_url):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Custom video URL must be a valid YouTube URL"
+                )
+        
+        job_id = str(uuid.uuid4())
+        
+        # Create job record with validation results
+        automation_jobs[job_id] = {
+            'job_id': job_id,
+            'status': 'queued',
+            'progress': 0,
+            'current_step': 0,
+            'total_steps': 4,
+            'step_name': 'Queued - Validation passed',
+            'created_at': datetime.now().isoformat(),
+            'request': request.model_dump(),
+            'validation': {
+                'steam_app_id_valid': True,
+                'game_name': validation_result.get('name') if request.mode == 'steam' else None,
+                'validated_at': datetime.now().isoformat()
+            }
+        }
+        
+        # Start background task
+        background_tasks.add_task(run_automation_job, job_id, request)
+        
+        logger.info(f"✅ PRODUCTION: Automation job {job_id} queued successfully")
+        return {
+            'job_id': job_id, 
+            'status': 'queued',
+            'message': f"Automation started for {validation_result.get('name', 'game')}"
+        }
+        
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except Exception as e:
+        logger.error(f"❌ PRODUCTION: Failed to start automation: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to start automation: {str(e)}"
+        )
 
 async def run_automation_job(job_id: str, request: AutomationRequest):
     """Run automation job with real API calls only"""
@@ -294,6 +467,41 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
+@app.post("/api/validation/steam-app-id")
+async def validate_steam_app_id_endpoint(request: dict):
+    """Validate Steam App ID without starting automation - PRODUCTION VERSION"""
+    try:
+        app_id = request.get('steam_app_id')
+        if not app_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Steam App ID is required"
+            )
+        
+        # Validate the Steam App ID
+        validation_result = await validate_steam_app_id(app_id)
+        
+        return {
+            'valid': True,
+            'app_id': validation_result['app_id'],
+            'game_name': validation_result['name'],
+            'game_type': validation_result['type'],
+            'message': f"Valid Steam game found: {validation_result['name']}"
+        }
+        
+    except ValueError as e:
+        return {
+            'valid': False,
+            'error': str(e),
+            'message': f"Invalid Steam App ID: {str(e)}"
+        }
+    except Exception as e:
+        logger.error(f"PRODUCTION: Validation endpoint error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Validation service temporarily unavailable"
+        )
+
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint"""
@@ -304,7 +512,8 @@ async def health_check():
         'active_jobs': len([j for j in automation_jobs.values() if j['status'] == 'running']),
         'total_jobs': len(automation_jobs),
         'environment': 'production',
-        'version': '1.0.0'
+        'version': '1.0.0',
+        'validation_available': True
     }
 
 @app.get("/")
