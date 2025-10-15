@@ -23,3 +23,4 @@ const nextConfig = {
 }
 
 module.exports = nextConfig
+/* Force frontend redeploy Wed Oct 15 21:19:47 PST 2025 */
