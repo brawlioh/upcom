@@ -1,30 +1,26 @@
 #!/usr/bin/env python3
 """
-Development Environment Startup Script
+Development Environment Startup Script - LOCAL ONLY
 Use this for local testing and development
 """
 import os
 import sys
 import uvicorn
 from dotenv import load_dotenv
+from environment_manager import env_manager
 
 def main():
-    print("🔧 Starting YouTube Reels Automation API (DEVELOPMENT MODE)")
-    print("📍 Local environment - Safe for testing")
-    print(f"Python version: {sys.version}")
-    print(f"Working directory: {os.getcwd()}")
+    # Print environment information
+    env_manager.print_environment_info()
     
-    # Load development environment variables
-    if os.path.exists('.env.development'):
-        load_dotenv('.env.development')
-        print("✅ Loaded .env.development")
-    else:
-        load_dotenv()  # Fallback to .env
-        print("⚠️  Using .env (create .env.development for better separation)")
+    # Ensure we're in development mode
+    if env_manager.environment == 'railway_production':
+        print("❌ ERROR: This script should not run in Railway production!")
+        print("🚀 Railway automatically uses railway_main.py")
+        sys.exit(1)
     
-    # Set development flags
-    os.environ['NODE_ENV'] = 'development'
-    os.environ['ENVIRONMENT'] = 'development'
+    # Force local development mode
+    os.environ['LOCAL_DEVELOPMENT'] = 'true'
     
     # Import the DEVELOPMENT API server (with all validation)
     print("Importing DEVELOPMENT API server...")

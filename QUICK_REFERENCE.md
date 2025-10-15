@@ -1,9 +1,16 @@
 # 🚀 Quick Reference - Development vs Production
 
+## 🔍 Check Current Environment
+
+```bash
+# Check what environment you're in
+python3 check_environment.py
+```
+
 ## 🔧 Local Development (Testing New Features)
 
 ```bash
-# 1. Start backend (development)
+# 1. Start backend (development) - SAFE FOR TESTING
 python3 start_development.py
 
 # 2. Start frontend (in new terminal)
@@ -19,12 +26,13 @@ npm run dev
 ## 🚀 Deploy to Railway Production
 
 ```bash
-# When local testing is successful:
+# SAFE deployment with checks
+python3 deploy_to_production.py
+
+# OR manual deployment:
 git add .
 git commit -m "feat: your feature description"
-git push origin production
-
-# Railway auto-deploys from production branch
+git push origin production  # Railway auto-deploys from production branch
 ```
 
 ## 📋 Current Production Status

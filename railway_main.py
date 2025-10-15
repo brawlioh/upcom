@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-Railway deployment entry point
+Railway deployment entry point - PRODUCTION ONLY
 Preserves all current working settings and configuration
 """
 import os
 import sys
 import uvicorn
 from dotenv import load_dotenv
+from environment_manager import env_manager
 
 # Load environment variables
 load_dotenv()
@@ -34,10 +35,14 @@ def validate_api_keys():
 
 def main():
     try:
-        print("🚀 Starting YouTube Reels Automation API (Railway - PRODUCTION)")
-        print("📡 Real API integrations only - NO SIMULATION")
-        print(f"Python version: {sys.version}")
-        print(f"Working directory: {os.getcwd()}")
+        # Print environment information
+        env_manager.print_environment_info()
+        
+        # Ensure we're in production mode
+        if not env_manager.environment == 'railway_production':
+            print("❌ ERROR: This script should only run in Railway production!")
+            print("🔧 For local development, use: python3 start_development.py")
+            sys.exit(1)
         
         # Validate API keys before starting
         print("Validating API keys...")
